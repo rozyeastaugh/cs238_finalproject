@@ -12,11 +12,9 @@ from scipy.stats import multivariate_normal
 
 
 # Sets all policies to 0 except for 5 random positions on the grid, which is sets to 1 (add park)
-def get_policy(S, A, park_limit):
+def get_policy(S, A, park_limit, parks):
     S.sort()
     final_policy = {key: 0 for key in S}
-    # parks = random.sample(list(S), park_limit)
-    parks = [0, 1, 2, 3, 4]
     for p in parks:
         final_policy[p] = 1
     return final_policy
@@ -64,9 +62,15 @@ start_time = time.time()
 num_states = 100
 S = np.arange(0, num_states)
 A = np.arange(0, num_states)
-final_policy = get_policy(S, A, park_limit)
+# best_comb_parks = [0, 1, 2, 3, 4]
+best_comb_parks = random.sample(list(A), park_limit)  # TODO: try this too
+final_policy = get_policy(S, A, park_limit, best_comb_parks)
 
 # TO COMPARE TO FWD SEARCH
+x, y = [], []  # Convert parks to coordinates
+for p in best_comb_parks:
+    x.append(int(p // 10) + 0.5)
+    y.append(p % 10 + 0.5)
 R = np.zeros(num_states)
 prob_dist = get_probabilities(num_states)
 parks_indices = np.where(np.array(list(final_policy.values())) == 1)
@@ -75,7 +79,8 @@ for p in list(parks_indices[0]):
 final_score, R, S = simulate(prob_dist, S, R)
 R_map = [R[0:10], R[10:20], R[20:30], R[30:40], R[40:50], R[50:60], R[60:70], R[70:80], R[80:90], R[90:100]]
 ax = sns.heatmap(R_map, linewidth=0.5)
+ax.scatter(x, y, marker='*', color='red')
 plt.title('Random Policy: Final Score = ' + str(final_score))
 
-plt.savefig('dummy')
-write_policy(final_policy, final_score, 'dummy.policy')
+plt.savefig('random')
+write_policy(final_policy, final_score, 'random.policy')

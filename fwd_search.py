@@ -45,8 +45,29 @@ def get_probabilities(num_states):
     return gaussian_probs(num_states)  # TODO: try uniform and random as well for final paper
 
 
-def simulate(prob_dist, S, R):
+def rollout(S, A, park_limit, prob_dist):
+    rollout_parks = random.sample(list(A), park_limit - 1)
+    temp = []
+    for a in rollout_parks:
+        S[a][0] = 1  # Place park there, change second index of tuple to 1
+        temp.append(prob_dist[a])
+        prob_dist[a] = 0
+    return rollout_parks, temp, S, prob_dist
+
+
+def restore(rollout_parks, temp, S, prob_dist):
+    # Restore state so can choose next action
+    for i in range(len(rollout_parks)):
+        a = rollout_parks[i]
+        S[a][0] = 0
+        prob_dist[a] = temp[i]
+    return S, prob_dist
+
+
+def simulate(prob_dist, S, A, R, park_limit):
     # TODO: pick 4 parks, set prob_dist to 0 for all of them
+    rollout_parks, temp, S, prob_dist = rollout(S, A, park_limit, prob_dist)
+    # TODO: incorporate distance into the algorithm, like if close to park then divide prob by 2
     for s in range(len(S)):
         if random.random() < prob_dist[s]:
             S[s][1] = 1
@@ -55,11 +76,12 @@ def simulate(prob_dist, S, R):
             S[s][1] = 0
             R[s] = 10  # # If not flooded, reward poistively TODO: try diff values here
     score = sum(R)
-    return score, R, S
+    S, prob_dist = restore(rollout_parks, temp, S, prob_dist)
+    return score, R, S, prob_dist
 
 
 # TODO: newer version, w/o bellman (or recursion?) - no need for T function? TA said good but check w mykel that this is fine
-def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_parks):
+def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_parks, park_limit):
     for d in range(depth):
         best = [None, -math.inf]  # (a, u)
         for a in A:
@@ -68,7 +90,7 @@ def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_p
             temp = prob_dist[a]
             prob_dist[a] = 0  # Change prob of flooding to zero
 
-            score, R, S = simulate(prob_dist, S, R)
+            score, R, S, prob_dist = simulate(prob_dist, S, A, R, park_limit)
 
             # Save if best
             if score > best[1]:  # NOTE: Write about this in project: experimenting with different metrics; added this cause unsure if ranking by utility is best or if it's better to rank by my more specific score metric; Marc said try both and write about it!
@@ -122,7 +144,7 @@ def fwd_search():
     # TODO: bellman version, reinstate if we want
     # final_policy, best_score, best_comb_parks = forward_search_bellman(S, d, U, A, T, R, gamma, prob_dist, best_score, best_comb_parks)[0]
 
-    best_comb_parks, best_scores, prob_dist, S = forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_parks)
+    best_comb_parks, best_scores, prob_dist, S = forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_parks, park_limit)
     final_policy = []
     for a in A:
         if a in best_comb_parks:
@@ -130,13 +152,20 @@ def fwd_search():
         else:
             final_policy.append(0)
 
+
+
     # TODO: ASK; calculate final score which way? do both and compare?
-    final_score, R, S = simulate(prob_dist, S, R)
+    final_score, R, S, prob_dist = simulate(prob_dist, S, A, R, park_limit)
     # final_score = sum(best_scores)/len(best_scores)  # Get average score
 
     # Draw heap map
+    x, y = [], []  # Convert parks to coordinates
+    for p in best_comb_parks:
+        x.append(int(p // 10) + 0.5)
+        y.append(p % 10 + 0.5)
     R_map = [R[0:10], R[10:20], R[20:30], R[30:40], R[40:50], R[50:60], R[60:70], R[70:80], R[80:90], R[90:100]]
     ax = sns.heatmap(R_map, linewidth=0.5)
+    ax.scatter(x, y, marker='*', color='red')
     plt.title('Fwd Search Policy: Final Score = ' + str(final_score))
     plt.savefig('fwd_search')
 
