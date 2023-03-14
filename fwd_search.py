@@ -1,7 +1,8 @@
-import sys
-import requests
-import io
-import pandas as pd
+'''
+FWD SEARCH: takes in 10x10 grid, loops through all actions (a la fwd search) to find placement of 5 parks that
+maximizes the sum of rewards (aka minimizes the number of grids that flood)
+'''
+
 import random
 import math
 import numpy as np
@@ -11,6 +12,9 @@ import matplotlib.pylab as plt
 import seaborn as sns
 
 
+# Writes final policy to a final .policy file (as we did in project 2), and includes the final score on the last line.
+# This policy is unused for our purposes, but is included for possible future use to compare policies given larger
+# datasets.
 def write_policy(final_policy, final_score, filename):
     with open(filename, 'w') as f:
         for a in final_policy:  # TODO: check if policy is list, change if not
@@ -18,6 +22,9 @@ def write_policy(final_policy, final_score, filename):
         f.write("Final Score: {}\n".format(final_score))
 
 
+# Returns a random probability distribution of flooding across the 10x10 grid (performed more poorly than gaussian,
+# which is why we ultimately chose to implement this with a gaussian prob dist, which may be more similar to actual
+# flooding data (i.e. given topology)).
 def random_probs(num_states):
     probs = np.zeros(num_states)
     for s in range(num_states):
@@ -25,10 +32,13 @@ def random_probs(num_states):
     return probs
 
 
+# Returns a uniform probability distribution of flooding across the 10x10 grid (performed more poorly than gaussian)
 def uniform_probs(num_states):
     return [.5]*num_states
 
 
+# Returns a gaussian probability distribution of flooding across the 10x10 grid (performed the best so is the one we
+# ultimately used for our model)
 def gaussian_probs(num_states):
     mean = [5, 5]
     cov = [[5, 0], [0, 5]]
@@ -36,15 +46,16 @@ def gaussian_probs(num_states):
     weights = []
     for i in range(10):  # Calculate pdf for all grid points
         for j in range(10):
-            weights.append(dist.pdf([i, j])/.03)  # TODO: added .03 so that prob in center was = .9, almost always floods
-    # weights = weights/sum(weights)
+            weights.append(dist.pdf([i, j])/.03)  # NOTE: added .03 to scale probs so that prob in center was = .9
     return weights
 
 
+# Returns the probability of flooding for each cell (from a gaussian distribution, as explained above)
 def get_probabilities(num_states):
-    return gaussian_probs(num_states)  # TODO: try uniform and random as well for final paper
+    return gaussian_probs(num_states) # NOTE: tried uniform and random as well but performed less well, mention in paper
 
 
+# Rollout: randomly adds four more parks to grid
 def rollout(S, A, park_limit, prob_dist):
     rollout_parks = random.sample(list(A), park_limit - 1)
     temp = []
@@ -55,6 +66,7 @@ def rollout(S, A, park_limit, prob_dist):
     return rollout_parks, temp, S, prob_dist
 
 
+# Restores the four random parks changed by the rollout back to their original states
 def restore(rollout_parks, temp, S, prob_dist):
     # Restore state so can choose next action
     for i in range(len(rollout_parks)):
@@ -64,23 +76,31 @@ def restore(rollout_parks, temp, S, prob_dist):
     return S, prob_dist
 
 
+#
 def simulate(prob_dist, S, A, R, park_limit):
-    # TODO: pick 4 parks, set prob_dist to 0 for all of them
+    # Rollout: pick 4 parks, set prob_dist to 0 for all of them
     rollout_parks, temp, S, prob_dist = rollout(S, A, park_limit, prob_dist)
-    # TODO: incorporate distance into the algorithm, like if close to park then divide prob by 2
+    # NOTE: to make this better, we could incorporate distance into the algorithm, i.e. if we're close to park then
+    # divide probability of flooding by 2 (mention in 'future directions' section of paper)
     for s in range(len(S)):
         if random.random() < prob_dist[s]:
             S[s][1] = 1
-            R[s] = -10  # If flooded, reward negatively TODO: try diff values here
+            R[s] = -10  # If flooded, reward negatively
+            # NOTE: could try different values for the reward here (possible future direction)
         else:
             S[s][1] = 0
-            R[s] = 10  # # If not flooded, reward poistively TODO: try diff values here
+            R[s] = 10  # # If not flooded, reward positively
+            # NOTE: could try different values for the reward here (possible future direction)
     score = sum(R)
     S, prob_dist = restore(rollout_parks, temp, S, prob_dist)
     return score, R, S, prob_dist
 
 
-# TODO: newer version, w/o bellman (or recursion?) - no need for T function? TA said good but check w mykel that this is fine
+# Runs forward search, as implemented in chapter 15. Main differences:
+# 1. uses sum of rewards (after simulating flooding given the placement of that park + the rollout) as a metric for
+# finding the best action, rather than calculating the utility vis the lookahead function (note that this means we
+# don't use our transition function)
+# 2. Loops forward search 5 times (i.e. since we're adding 5 parks) in order to return the best 5 parks to add
 def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_parks, park_limit):
     for d in range(depth):
         best = [None, -math.inf]  # (a, u)
@@ -93,7 +113,7 @@ def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_p
             score, R, S, prob_dist = simulate(prob_dist, S, A, R, park_limit)
 
             # Save if best
-            if score > best[1]:  # NOTE: Write about this in project: experimenting with different metrics; added this cause unsure if ranking by utility is best or if it's better to rank by my more specific score metric; Marc said try both and write about it!
+            if score > best[1]:  # NOTE: Write about this in project: experimented with different metrics, decided optimizing sum of rewards was better for our project than optimizing utility
                 best = [a, score]
 
             # Restore state so can choose next action
@@ -123,26 +143,16 @@ def fwd_search():
 
     # Formulate/Initialize MDP
     S = []
-    A = np.arange(0, num_states)  # TODO: check that should start at 1, not 0
-    for i in range(num_states): # Initialize states as (whether it has a park there, whether it flooded or not) # NOTE: removed position bc encoded as index of s in S, took out prob of flood bc need deterministic states
+    A = np.arange(0, num_states)
+    for i in range(num_states):  # Initialize states as (whether it has a park there, whether it flooded or not)
         S.append([0, random.random() < prob_dist[i]])
     R = np.zeros(num_states)
     T = np.zeros([num_states, num_states, num_states])
-    U = np.zeros(num_states)
-    gamma = 0.95  # TODO: play around with diff values
-
-    # Find optimal placement of parks using forward search
-    '''
-    # NOTE: Marc's other idea for getting all 5 actions was to run fwd search 5 times, 1st time run w depth = 5, 2nd time run w depth = 4, etc until d is 1
-    for d in depth:
-        run fwd search for d = 5,4,3,2,1
-    '''
+    U = np.zeros(num_states)  # NOTE: in our final version, this is unused since we don't calculate utility
+    gamma = 0.95  # NOTE: in our final version, this is unused since we don't calculate utility/use the bellman equation
 
     best_scores = []
     best_comb_parks = []
-
-    # TODO: bellman version, reinstate if we want
-    # final_policy, best_score, best_comb_parks = forward_search_bellman(S, d, U, A, T, R, gamma, prob_dist, best_score, best_comb_parks)[0]
 
     best_comb_parks, best_scores, prob_dist, S = forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_parks, park_limit)
     final_policy = []
@@ -152,11 +162,8 @@ def fwd_search():
         else:
             final_policy.append(0)
 
-
-
-    # TODO: ASK; calculate final score which way? do both and compare?
     final_score, R, S, prob_dist = simulate(prob_dist, S, A, R, park_limit)
-    # final_score = sum(best_scores)/len(best_scores)  # Get average score
+    # final_score = sum(best_scores)/len(best_scores)  # NOTE: alt way to calculate final score (get avg score), write about in final paper
 
     # Draw heap map
     x, y = [], []  # Convert parks to coordinates
@@ -179,8 +186,8 @@ fwd_search()
 
 
 
-# TODO: NOTE lookahead, transition, fwd_search commented out below bc mykel said we didnt need to use them,
-#  implemented simpler version above
+# NOTE lookahead, transition, fwd_search commented out below bc mykel said we didnt need to use them,
+# implemented simpler version above
 '''
 def transition(T, prob_dist, a, s, sp):  # TODO: make T update all states
     T[s, a, sp] = (1 if sp == a else 0, 0 if sp == a else random.random() < prob_dist[s])  # 3D 100x100x100 matrix

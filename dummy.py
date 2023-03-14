@@ -1,8 +1,14 @@
+'''
+This file was used to return both the dummy policy and random policy, to compare to the fwd search policy
+
+DUMMY: takes in 10x10 grid, sets placement of parks to be first 5 cells (first 5 rows of column 0), calculates sum of
+rewards
+
+RANDOM: takes in 10x10 grid, adds 5 random placement of parks, calculates sum of rewards
+'''
+
+
 import random
-import sys
-import requests
-import io
-import pandas as pd
 import numpy as np
 import math
 import time
