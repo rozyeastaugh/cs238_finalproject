@@ -56,8 +56,8 @@ def get_probabilities(num_states):
 
 
 # Rollout: randomly adds four more parks to grid
-def rollout(S, A, park_limit, prob_dist):
-    rollout_parks = random.sample(list(A), park_limit - 1)
+def rollout(S, A, park_limit, prob_dist, num_rollout_parks):
+    rollout_parks = random.sample(list(A), num_rollout_parks)
     temp = []
     for a in rollout_parks:
         S[a][0] = 1  # Place park there, change second index of tuple to 1
@@ -90,9 +90,9 @@ def restore(rollout_parks, temp, S, prob_dist):
 
 
 #
-def simulate(prob_dist, S, A, R, park_limit):
+def simulate(prob_dist, S, A, R, park_limit, num_rollout_parks):
     # Rollout: pick 4 parks, set prob_dist to 0 for all of them
-    rollout_parks, temp, S, prob_dist = rollout(S, A, park_limit, prob_dist)
+    rollout_parks, temp, S, prob_dist = rollout(S, A, park_limit, prob_dist, num_rollout_parks)
     # NOTE: to make this better, we could incorporate distance into the algorithm, i.e. if we're close to park then
     # divide probability of flooding by 2 (mention in 'future directions' section of paper)
     for s in range(len(S)):
@@ -115,6 +115,7 @@ def simulate(prob_dist, S, A, R, park_limit):
 # don't use our transition function)
 # 2. Loops forward search 5 times (i.e. since we're adding 5 parks) in order to return the best 5 parks to add
 def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_parks, park_limit):
+    num_rollout_parks = depth - 1
     for d in range(depth):
         best = [None, -math.inf]  # (a, u)
         for a in A:
@@ -123,7 +124,7 @@ def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_p
             temp = prob_dist[a]
             prob_dist[a] = 0  # Change prob of flooding to zero
 
-            score, R, S, prob_dist = simulate(prob_dist, S, A, R, park_limit)
+            score, R, S, prob_dist = simulate(prob_dist, S, A, R, park_limit, num_rollout_parks)
 
             # Save if best
             if score > best[1]:  # NOTE: Write about this in project: experimented with different metrics, decided optimizing sum of rewards was better for our project than optimizing utility
@@ -138,6 +139,7 @@ def forward_search(S, depth, A, T, R, gamma, prob_dist, best_scores, best_comb_p
         prob_dist[best[0]] = 0
         idx = np.where(A == best[0])
         A = np.delete(A, idx)
+        num_rollout_parks = num_rollout_parks - 1
     return best_comb_parks, best_scores, prob_dist, S
 
 
