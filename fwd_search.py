@@ -63,6 +63,19 @@ def rollout(S, A, park_limit, prob_dist):
         S[a][0] = 1  # Place park there, change second index of tuple to 1
         temp.append(prob_dist[a])
         prob_dist[a] = 0
+
+        # # defining bounds
+        # left_bound = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+        # right_bound = [9, 19, 29, 39, 49, 59, 69, 79, 89, 99]
+        # top_bound = [S[:10]]
+        # bottom_bound = [S[90:]]
+        # north, south, west, east = a - 10, a + 10, a - 1, a + 1
+        #
+        # if north > 0: prob_dist[north] = 0
+        # if south < 99: prob_dist[south] = 0
+        # if west not in right_bound and west >= 0: prob_dist[west] = 0
+        # if east not in left_bound and east <= 99: prob_dist[east] = 0
+
     return rollout_parks, temp, S, prob_dist
 
 
